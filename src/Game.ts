@@ -875,6 +875,9 @@ export default class Game {
                     // Play break effect
                     this.world.breakObstacle(obs);
 
+                    // Jade Drop Logic (All Obstacles)
+                    this.checkJadeDrop(obs.position);
+
                     if (this.potionCharges <= 0) {
                         this.potionActive = false;
                         this.player.setMetallicSkin(false);
@@ -887,6 +890,52 @@ export default class Game {
                 }
             }
         }
+    }
+
+    checkJadeDrop(pos: THREE.Vector3) {
+        // 60% Chance to drop Jade from ANY obstacle
+        if (Math.random() < 0.60) {
+            this.totalJades++;
+            this.saveData();
+            if (this.totalJadesHudEl) this.totalJadesHudEl.innerText = this.totalJades.toString();
+            this.showFloatingText('+1 Jade', pos, '#00ff00');
+        }
+    }
+
+    showFloatingText(text: string, pos: THREE.Vector3, color: string) {
+        const div = document.createElement('div');
+        div.innerText = text;
+        div.style.position = 'absolute';
+        div.style.color = color;
+        div.style.fontWeight = 'bold';
+        div.style.fontSize = '24px';
+        div.style.pointerEvents = 'none';
+        div.style.textShadow = '0 0 10px ' + color;
+        div.style.transition = 'all 1s ease-out';
+        div.style.zIndex = '1000';
+        div.style.fontFamily = 'Arial, sans-serif';
+
+        // Project position to screen
+        const vector = pos.clone();
+        vector.project(this.camera);
+
+        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-(vector.y * 0.5) + 0.5) * window.innerHeight;
+
+        div.style.left = `${x}px`;
+        div.style.top = `${y}px`;
+
+        document.body.appendChild(div);
+
+        // Animate
+        requestAnimationFrame(() => {
+            div.style.transform = 'translateY(-100px)';
+            div.style.opacity = '0';
+        });
+
+        setTimeout(() => {
+            div.remove();
+        }, 1000);
     }
 
     triggerCameraShake(intensity: number) {

@@ -137,8 +137,9 @@
     width: clamp(45px, 10vw, 55px);
     height: clamp(45px, 10vw, 55px);
     font-size: clamp(1.2rem, 3vw, 1.8rem);
-    bottom: calc(125px + env(safe-area-inset-bottom));
+    top: calc(80px + env(safe-area-inset-top));
     right: calc(15px + env(safe-area-inset-right));
+    bottom: auto;
   }
 
   #bag-btn {

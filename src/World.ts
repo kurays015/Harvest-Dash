@@ -565,10 +565,12 @@ export default class World {
         const count = 10; // Slightly more particles for better feel
         let color = 0x8B4513; // Default Crate/Box (Wood)
 
-        if (type === 'rock') {
+        if (type === 'rock' || type === 'stone') {
             color = 0x888888; // Grey Stone
         } else if (type === 'hay') {
             color = 0xFFD700; // Yellow/Golden Hay
+        } else if (type === 'box' || type === 'crate') {
+            color = 0x8B4513; // Brown Wood
         }
 
         const particleGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
