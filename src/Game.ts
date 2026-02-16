@@ -453,6 +453,25 @@ export default class Game {
         });
 
         this.updateStartUI();
+
+        // Splash Screen Removal Logic
+        const splash = document.getElementById('splash-screen');
+        const fill = document.getElementById('loading-bar-fill');
+        if (splash && fill) {
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        splash.style.opacity = '0';
+                        setTimeout(() => splash.style.display = 'none', 500);
+                    }, 500);
+                }
+                fill.style.width = progress + '%';
+            }, 100);
+        }
     }
 
     updateStartUI() {
