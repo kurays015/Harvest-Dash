@@ -118,6 +118,12 @@ export default class Game {
     isMuted: boolean = false;
     musicFadeInterval: any = null;
 
+    // SFX
+    coinSfx!: HTMLAudioElement;
+    jumpSfx!: HTMLAudioElement;
+    jadeSfx!: HTMLAudioElement;
+    breakSfx!: HTMLAudioElement;
+
     constructor() {
         console.log('%cTesting Mode Active: Press G for Gold, L for Items/Jump, Reset Button in Shop', 'color: #00ffff; font-weight: bold; font-size: 1.2rem;');
 
@@ -167,16 +173,51 @@ export default class Game {
 
     init() {
         // Audio Setup
-        this.bgm = new Audio('https://www.chosic.com/wp-content/uploads/2021/04/Alexander-Nakarada-Farm.mp3');
+        this.bgm = new Audio('https://freetestdata.com/wp-content/uploads/2021/09/Free_Test_Data_1MB_MP3.mp3');
         this.bgm.loop = true;
-        this.bgm.volume = this.isMuted ? 0 : 0.5;
+        this.bgm.volume = this.isMuted ? 0 : 0.6;
+        this.bgm.onerror = () => console.error('Audio Source Missing: BGM');
 
         this.menuBgm = new Audio('https://www.chosic.com/wp-content/uploads/2021/07/Country-Village.mp3');
         this.menuBgm.loop = true;
-        this.menuBgm.volume = this.isMuted ? 0 : 0.5;
+        this.menuBgm.volume = this.isMuted ? 0 : 0.6;
+        this.menuBgm.onerror = () => console.error('Audio Source Missing: Menu BGM');
 
-        // Auto-play on first interaction
+        this.coinSfx = new Audio('https://www.soundjay.com/buttons/sounds/button-35.mp3');
+        this.coinSfx.volume = 1.0;
+        this.coinSfx.onerror = () => console.error('Audio Source Missing: Coin SFX');
+
+        this.jumpSfx = new Audio('https://www.soundjay.com/buttons/sounds/button-27.mp3');
+        this.jumpSfx.volume = 1.0;
+        this.jumpSfx.preload = 'auto';
+        this.jumpSfx.onerror = () => { console.error('Audio Source Missing: Jump SFX'); this.playSfx('jump'); };
+
+        this.jadeSfx = new Audio('https://www.soundjay.com/buttons/sounds/button-09.mp3');
+        this.jadeSfx.volume = 1.0; // Max HTML volume is 1.0
+        this.jadeSfx.preload = 'auto';
+        this.jadeSfx.onerror = () => { console.error('Audio Source Missing: Jade SFX'); this.playSfx('jade'); };
+
+        this.breakSfx = new Audio('https://www.soundjay.com/buttons/sounds/button-10.mp3');
+        this.breakSfx.volume = 1.0;
+        this.breakSfx.preload = 'auto';
+        this.breakSfx.onerror = () => { console.error('Audio Source Missing: Break SFX'); this.playSfx('break'); };
+
+        // Auto-play on first interaction & Resume AudioContext
         const startAudio = () => {
+            const context = (window as any).AudioContext || (window as any).webkitAudioContext;
+            if (context) {
+                const audioCtx = new context();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            }
+
+            // Persistence: Start BOTH tracks now, but at zero volume
+            this.bgm.volume = 0;
+            this.menuBgm.volume = 0;
+            this.bgm.play().catch(() => { });
+            this.menuBgm.play().catch(() => { });
+
             if (!this.isPlaying) {
                 this.switchMusic('menu');
             } else {
@@ -1096,6 +1137,13 @@ export default class Game {
             }
 
             // Resume Game
+            const context = (window as any).AudioContext || (window as any).webkitAudioContext;
+            if (context) {
+                const audioCtx = new context();
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            }
+            this.switchMusic('game');
+
             this.isPlaying = true;
             this.gameIsOver = false;
             this.clock.start();
@@ -1254,14 +1302,7 @@ export default class Game {
         }
 
         if (coinsCollected > 0) {
-            this.runCoins += coinsCollected;
-            this.runGoldValEl.innerText = this.runCoins.toString();
-
-            // Pop Logic
-            this.hud.classList.add('pop');
-            setTimeout(() => {
-                this.hud.classList.remove('pop');
-            }, 100);
+            this.onCollectGold(coinsCollected);
         }
 
         // Collision Check
@@ -1278,7 +1319,7 @@ export default class Game {
                 this.shakeTime = 0.5;
 
                 // Play break effect
-                this.world.breakObstacle(obs);
+                this.onBreakObstacle(obs);
 
                 // Quest Progress: Stones
                 if (obs.userData.type === 'rock') {
@@ -1307,15 +1348,35 @@ export default class Game {
 
     checkJadeDrop(pos: THREE.Vector3) {
         if (Math.random() < 0.65) { // 65% Jade Drop Chance
-            this.totalJades++;
-
-            // Quest Progress: Jades
-            this.updateQuestProgress('jades', 1);
-
-            this.saveData();
-            this.showFloatingText('+1 JADE', pos, '#4CAF50');
-            if (this.totalJadesHudEl) this.totalJadesHudEl.innerText = this.totalJades.toString();
+            this.onCollectJade(pos);
         }
+    }
+
+    onCollectGold(count: number) {
+        this.runCoins += count;
+        this.runGoldValEl.innerText = this.runCoins.toString();
+        // Multi-channel trigger for each coin
+        for (let i = 0; i < count; i++) {
+            this.playSfx('coin');
+        }
+
+        // Visual Pop
+        this.hud.classList.add('pop');
+        setTimeout(() => this.hud.classList.remove('pop'), 100);
+    }
+
+    onCollectJade(pos: THREE.Vector3) {
+        this.totalJades++;
+        this.playSfx('jade');
+        this.updateQuestProgress('jades', 1);
+        this.saveData();
+        this.showFloatingText('+1 JADE', pos, '#4CAF50');
+        if (this.totalJadesHudEl) this.totalJadesHudEl.innerText = this.totalJades.toString();
+    }
+
+    onBreakObstacle(obs: any) {
+        this.playSfx('break');
+        this.world.breakObstacle(obs);
     }
 
     showFloatingText(text: string, pos: THREE.Vector3, color: string) {
@@ -1508,20 +1569,72 @@ export default class Game {
     }
 
     switchMusic(type: 'menu' | 'game') {
-        if (this.currentBgm) {
-            this.currentBgm.pause();
+        const nextBgm = type === 'menu' ? this.menuBgm : this.bgm;
+        const otherBgm = type === 'menu' ? this.bgm : this.menuBgm;
+
+        if (this.currentBgm === nextBgm) return; // Keep playing, do nothing
+        this.currentBgm = nextBgm;
+
+        // Ensure both continue playing (Persistence)
+        if (this.bgm && this.menuBgm) {
+            this.bgm.play().catch(() => { });
+            this.menuBgm.play().catch(() => { });
         }
 
-        if (type === 'menu') {
-            this.currentBgm = this.menuBgm;
+        const targetVol = this.isMuted ? 0 : 0.6;
+        this.fadeCross(nextBgm, otherBgm, targetVol);
+        this.updateMusicButtons();
+    }
+
+    playSfx(type: 'coin' | 'jump' | 'jade' | 'break') {
+        if (this.isMuted) return;
+
+        let sfx: HTMLAudioElement | null = null;
+        let fallbackFreq = 440;
+
+        if (type === 'coin') {
+            sfx = this.coinSfx;
+            fallbackFreq = 880;
+        } else if (type === 'jump') {
+            sfx = this.jumpSfx;
+            fallbackFreq = 660;
+        } else if (type === 'jade') {
+            sfx = this.jadeSfx;
+            fallbackFreq = 1200;
+        } else if (type === 'break') {
+            sfx = this.breakSfx;
+            fallbackFreq = 220;
+        }
+
+        const playFallback = () => {
+            try {
+                const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+                if (context.state === 'suspended') context.resume();
+                const osc = context.createOscillator();
+                const gain = context.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(fallbackFreq, context.currentTime);
+                gain.gain.setValueAtTime(0.1, context.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, context.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(context.destination);
+                osc.start();
+                osc.stop(context.currentTime + 0.1);
+            } catch (e) {
+                console.warn('Synth Fallback Failed');
+            }
+        };
+
+        if (sfx && sfx.readyState >= 2) {
+            // Overlap Fix: Clone and play
+            const clone = sfx.cloneNode() as HTMLAudioElement;
+            clone.volume = sfx.volume;
+            clone.play().catch(e => {
+                console.warn(`${type} File failed, playing synth fallback`);
+                playFallback();
+            });
         } else {
-            this.currentBgm = this.bgm;
-        }
-
-        if (this.currentBgm) {
-            this.currentBgm.currentTime = 0;
-            this.currentBgm.volume = this.isMuted ? 0 : 0.5;
-            this.currentBgm.play().catch(e => console.log('Audio play blocked until interaction'));
+            playFallback();
         }
     }
 
@@ -1529,29 +1642,38 @@ export default class Game {
         this.isMuted = !this.isMuted;
         localStorage.setItem('isMuted', this.isMuted.toString());
 
-        const targetVol = this.isMuted ? 0 : 0.5;
-        this.fadeMusic(targetVol);
+        const targetVol = this.isMuted ? 0 : 0.6;
+        if (this.currentBgm) {
+            const otherBgm = this.currentBgm === this.bgm ? this.menuBgm : this.bgm;
+            this.fadeCross(this.currentBgm, otherBgm, targetVol);
+        }
         this.updateMusicButtons();
     }
 
-    fadeMusic(targetVolume: number) {
+    fadeCross(active: HTMLAudioElement, inactive: HTMLAudioElement, targetVolume: number) {
         if (this.musicFadeInterval) clearInterval(this.musicFadeInterval);
-        if (!this.currentBgm) return;
 
         const step = 0.05;
         this.musicFadeInterval = setInterval(() => {
-            if (!this.currentBgm) {
-                clearInterval(this.musicFadeInterval);
-                return;
+            // Fade in active
+            if (active.volume < targetVolume) {
+                active.volume = Math.min(active.volume + step, targetVolume);
+            } else if (active.volume > targetVolume) {
+                active.volume = Math.max(active.volume - step, targetVolume);
             }
 
-            if (this.currentBgm.volume < targetVolume) {
-                this.currentBgm.volume = Math.min(this.currentBgm.volume + step, targetVolume);
-            } else if (this.currentBgm.volume > targetVolume) {
-                this.currentBgm.volume = Math.max(this.currentBgm.volume - step, targetVolume);
+            // Fade out inactive
+            if (inactive.volume > 0) {
+                inactive.volume = Math.max(inactive.volume - step, 0);
             }
 
-            if (this.currentBgm.volume === targetVolume) {
+            // Check if both reached their targets
+            const activeDone = Math.abs(active.volume - targetVolume) < 0.01;
+            const inactiveDone = inactive.volume === 0;
+
+            if (activeDone && inactiveDone) {
+                active.volume = targetVolume;
+                inactive.volume = 0;
                 clearInterval(this.musicFadeInterval);
                 this.musicFadeInterval = null;
             }

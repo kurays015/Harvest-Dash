@@ -144,6 +144,7 @@ export default class Player {
         if (!this.isJumping) {
             this.velocity = 12.0;
             this.isJumping = true;
+            this.game.playSfx('jump');
         }
     }
 
